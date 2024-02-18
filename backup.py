@@ -7,8 +7,8 @@ from pprint import pprint
 
 
 COLLECTIONS = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/bibs/collections?level=2&format=json&apikey="
-BIBS1 = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/bibs/collections/"
-BIBS2 = "/bibs?level=2&format=json&apikey="
+BIBS_PARAMS = "/bibs?level=2&format=json&apikey="
+bibs_url = []
 
 load_dotenv()
 today = str(date.today())
@@ -16,8 +16,16 @@ os.makedirs("data/" + today, exist_ok=True)
 
 with open("data/" + today + "/collections.json", "w") as f:
     response = httpx.get(COLLECTIONS + os.getenv("APIKEY"))
-    collections = json.dumps(response.json())
+    data = response.json()
+    collections = json.dumps(data)
     f.write(collections)
 
-for collection in collections:
-    pass
+def bibs(collections):
+    for collection in collections["collection"]:
+        if "collection" in collection:
+            bibs(collection)
+            bibs_url.append(collection["pid"]["link"] + BIBS_PARAMS + os.getenv("APIKEY"))
+        else:
+            bibs_url.append(collection["pid"]["link"] + BIBS_PARAMS + os.getenv("APIKEY"))
+
+bibs(data)
