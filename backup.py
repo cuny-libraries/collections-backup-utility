@@ -7,7 +7,7 @@ from pprint import pprint
 
 
 COLLECTIONS = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/bibs/collections?level=2&format=json&apikey="
-BIBS_PARAMS = "/bibs?level=2&format=json&apikey="
+BIBS_PARAMS = "/bibs?level=2&format=json&limit=100&offset=5000&apikey="
 bibs_url = []
 
 
@@ -16,6 +16,7 @@ today = str(date.today())
 
 
 def bibs(collections):
+    """ Recursively search collections and create urls """
     for collection in collections["collection"]:
         if "collection" in collection:
             bibs(collection)
@@ -28,20 +29,26 @@ def bibs(collections):
 
 
 def main():
+    """ run the program """
+
+    # see if data for today already exists
     try:
         os.makedirs("data/" + today, exist_ok=False)
     except FileExistsError:
         print("Data for today already exists")
         return
 
+    # get collections data
     with open("data/" + today + "/collections.json", "w") as f1:
         response = httpx.get(COLLECTIONS + os.getenv("APIKEY"))
         data = response.json()
         collections = json.dumps(data)
         f1.write(collections)
 
+    # create urls for bibs data, save as tuples along with name
     bibs(data)
 
+    # create bibs files; populate from API
     for index, url in enumerate(bibs_url):
         with open(
             "data/" + today + "/" + str(index) + " -- " + url[1] + ".json", "w"
