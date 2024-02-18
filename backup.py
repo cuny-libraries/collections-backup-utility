@@ -19,7 +19,12 @@ def bibs(collections):
     for collection in collections["collection"]:
         if "collection" in collection:
             bibs(collection)
-        bibs_url.append(collection["pid"]["link"] + BIBS_PARAMS + os.getenv("APIKEY"))
+        bibs_url.append(
+            (
+                collection["pid"]["link"] + BIBS_PARAMS + os.getenv("APIKEY"),
+                collection["name"],
+            )
+        )
 
 
 def main():
@@ -38,11 +43,13 @@ def main():
     bibs(data)
 
     for index, url in enumerate(bibs_url):
-        with open("data/" + today + "/bibs" + str(index) + ".json", "w") as f2:
-            response = httpx.get(url)
+        with open(
+            "data/" + today + "/" + str(index) + " -- " + url[1] + ".json", "w"
+        ) as f2:
+            response = httpx.get(url[0])
             data = response.json()
-            bib = json.dumps(data)
-            f2.write(bib)
+            bibs_json = json.dumps(data)
+            f2.write(bibs_json)
 
 
 main()
