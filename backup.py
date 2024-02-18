@@ -24,8 +24,6 @@ def bibs(collections):
     for collection in collections["collection"]:
         if "collection" in collection:
             bibs(collection)
-            bibs_url.append(collection["pid"]["link"] + BIBS_PARAMS + os.getenv("APIKEY"))
-        else:
-            bibs_url.append(collection["pid"]["link"] + BIBS_PARAMS + os.getenv("APIKEY"))
+        bibs_url.append(collection["pid"]["link"] + BIBS_PARAMS + os.getenv("APIKEY"))
 
 bibs(data)
