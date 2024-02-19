@@ -23,10 +23,10 @@ def bibs(collections):
         counter = 0
         json_output = []
 
-        return_data = paginate(collection, counter, json_output)
+        paginate(collection, counter, json_output)
 
         with open("data/" + TODAY + "/" + collection["name"] + ".json", "w") as f2:
-            bibs_json = json.dumps(return_data)
+            bibs_json = json.dumps(json_output)
             f2.write(bibs_json)
 
 
@@ -40,17 +40,19 @@ def paginate(collection, counter, json_output):
             + "&offset="
             + str(counter)
         )
+
         response = httpx.get(url, timeout=30)
         data = response.json()
         json_output.append(data)
         counter += 100
+
         if "bib" in data:
             pprint(data["total_record_count"])
             pprint(counter)
             pprint("-------")
             paginate(collection, counter, json_output)
-    else:
-        return json_output
+        else:
+            return json_output
 
 
 def main():
