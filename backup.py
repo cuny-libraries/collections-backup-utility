@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from pprint import pprint
 
 
-COLLECTIONS = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/bibs/collections?level=2&format=json&apikey="
+COLLECTIONS = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/bibs/collections?level=20&format=json&apikey="
 BIBS_PARAMS = "/bibs?level=2&format=json&limit=100&apikey="
 TODAY = str(date.today())
 
