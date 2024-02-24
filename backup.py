@@ -41,7 +41,7 @@ def paginate(collection, counter, json_output):
             + str(counter)
         )
 
-        response = httpx.get(url, timeout=30)
+        response = httpx.get(url, timeout=60)
         data = response.json()
         json_output.append(data)
         counter += 100
