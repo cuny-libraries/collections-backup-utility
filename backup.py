@@ -14,29 +14,33 @@ TODAY = str(date.today())
 config = dotenv.dotenv_values(".env")
 
 
-def bibs(collections):
+def bibs(collections, key, college):
     """Recursively search collections and create urls"""
-    for collection in collections["collection"]:
-        if "collection" in collection:
-            bibs(collection)
+    try:
+        for collection in collections["collection"]:
+            if "collection" in collection:
+                bibs(collection, key, college)
 
-        counter = 0
-        json_output = []
+            counter = 0
+            json_output = []
 
-        paginate(collection, counter, json_output)
+            paginate(collection, counter, json_output, key)
 
-        with open("data/" + TODAY + "/" + collection["name"] + ".json", "w") as f2:
-            bibs_json = json.dumps(json_output)
-            f2.write(bibs_json)
+            with open("data/" + TODAY + "/" + college + "/" + collection["name"] + ".json", "w") as f2:
+                bibs_json = json.dumps(json_output)
+                f2.write(bibs_json)
+    except KeyError:
+        print("No collections found.")
+        return
 
 
-def paginate(collection, counter, json_output):
+def paginate(collection, counter, json_output, key):
     """Paginate through results"""
     if "pid" in collection:
         url = (
             collection["pid"]["link"]
             + BIBS_PARAMS
-            + os.getenv("APIKEY")
+            + key 
             + "&offset="
             + str(counter)
         )
@@ -47,7 +51,7 @@ def paginate(collection, counter, json_output):
         counter += 100
 
         if "bib" in data:
-            paginate(collection, counter, json_output)
+            paginate(collection, counter, json_output, key)
         else:
             return json_output
 
@@ -67,13 +71,13 @@ def main():
         # get collections data
         with open("data/" + TODAY + "/" + college + "/COLLECTIONS.json", "w") as f1:
             response = httpx.get(COLLECTIONS + key, timeout=200)
-            pprint(response)
             data = response.json()
+            pprint(data)
             collections = json.dumps(data)
             f1.write(collections)
 
         # create urls for bibs data, save as tuples along with name
-        bibs(data)
+        bibs(data, key, college)
 
 
 main()
