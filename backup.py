@@ -26,7 +26,9 @@ def bibs(collections, key, college):
 
             paginate(collection, counter, json_output, key)
 
-            with open("data/" + TODAY + "/" + college + "/" + collection["name"] + ".json", "w") as f2:
+            coll_name = collection["name"].replace("/", ".")
+
+            with open("data/" + TODAY + "/" + college + "/" + coll_name + ".json", "w") as f2:
                 bibs_json = json.dumps(json_output)
                 f2.write(bibs_json)
     except KeyError:
@@ -72,7 +74,6 @@ def main():
         with open("data/" + TODAY + "/" + college + "/COLLECTIONS.json", "w") as f1:
             response = httpx.get(COLLECTIONS + key, timeout=200)
             data = response.json()
-            pprint(data)
             collections = json.dumps(data)
             f1.write(collections)
 
