@@ -9,7 +9,7 @@ from pprint import pprint
 COLLECTIONS = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/bibs/collections?level=20&format=json&apikey="
 BIBS_PARAMS = "/bibs?level=2&format=json&limit=100&apikey="
 TODAY = str(date.today())
-
+mmsids = []
 
 config = dotenv.dotenv_values(".env")
 
@@ -22,40 +22,39 @@ def bibs(collections, key, college):
                 bibs(collection, key, college)
 
             counter = 0
-            json_output = []
+            paginate(collection, counter, key)
 
-            paginate(collection, counter, json_output, key)
-
+            # remove "/"s from collection names so they don't break paths
             coll_name = collection["name"].replace("/", ".")
+            global mmsids
 
-            with open("data/" + TODAY + "/" + college + "/" + coll_name + ".json", "w") as f2:
-                bibs_json = json.dumps(json_output)
+            with open(
+                "data/" + TODAY + "/" + college + "/" + coll_name + ".json", "w"
+            ) as f2:
+                bibs_json = json.dumps(mmsids)
                 f2.write(bibs_json)
+            mmsids = []
     except KeyError:
         print("No collections found.")
         return
 
 
-def paginate(collection, counter, json_output, key):
+def paginate(collection, counter, key):
     """Paginate through results"""
     if "pid" in collection:
-        url = (
-            collection["pid"]["link"]
-            + BIBS_PARAMS
-            + key 
-            + "&offset="
-            + str(counter)
-        )
+        url = collection["pid"]["link"] + BIBS_PARAMS + key + "&offset=" + str(counter)
 
-        response = httpx.get(url, timeout=60)
+        response = httpx.get(url, timeout=200)
         data = response.json()
-        json_output.append(data)
         counter += 100
+        global mmsids
 
         if "bib" in data:
-            paginate(collection, counter, json_output, key)
+            for bib in data["bib"]:
+                mmsids.append(bib["mms_id"])
+            paginate(collection, counter, key)
         else:
-            return json_output
+            return
 
 
 def main():
