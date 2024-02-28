@@ -15,7 +15,7 @@ config = dotenv.dotenv_values(".env")
 
 
 def bibs(collections, key, college):
-    """Recursively search collections and create urls"""
+    """Recursively search collections"""
     try:
         for collection in collections["collection"]:
             if "collection" in collection:
@@ -29,10 +29,11 @@ def bibs(collections, key, college):
             global mmsids
 
             with open(
-                "data/" + TODAY + "/" + college + "/" + coll_name + ".json", "w"
+                "data/" + TODAY + "/" + college + "/" + coll_name + ".csv", "w"
             ) as f2:
-                bibs_json = json.dumps(mmsids)
-                f2.write(bibs_json)
+                f2.write("MMS ID\n")
+                for mmsid in mmsids:
+                    f2.write(mmsid + "\n")
             mmsids = []
     except KeyError:
         print("No collections found.")
@@ -76,7 +77,6 @@ def main():
             collections = json.dumps(data)
             f1.write(collections)
 
-        # create urls for bibs data, save as tuples along with name
         bibs(data, key, college)
 
 
