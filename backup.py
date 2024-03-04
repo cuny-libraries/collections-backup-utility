@@ -45,7 +45,7 @@ def paginate(collection, counter, key):
     if "pid" in collection:
         url = collection["pid"]["link"] + BIBS_PARAMS + key + "&offset=" + str(counter)
 
-        response = httpx.get(url, timeout=200)
+        response = httpx.get(url, timeout=500)
         data = response.json()
         counter += 100
         global mmsids
@@ -72,7 +72,7 @@ def main():
 
         # get collections data
         with open("data/" + TODAY + "/" + college + "/COLLECTIONS.json", "w") as f1:
-            response = httpx.get(COLLECTIONS + key, timeout=200)
+            response = httpx.get(COLLECTIONS + key, timeout=500)
             data = response.json()
             collections = json.dumps(data)
             f1.write(collections)
