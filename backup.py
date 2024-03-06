@@ -6,7 +6,8 @@ from datetime import date
 from pprint import pprint
 
 
-COLLECTIONS = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/bibs/collections?level=20&format=json&apikey="
+COLLECTIONS_JSON = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/bibs/collections?level=20&format=json&apikey="
+COLLECTIONS_XML = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/bibs/collections?level=20&apikey="
 BIBS_PARAMS = "/bibs?level=2&format=json&limit=100&apikey="
 TODAY = str(date.today())
 mmsids = []
@@ -70,14 +71,17 @@ def main():
             print("Data for today already exists")
             return
 
-        # get collections data
-        with open("data/" + TODAY + "/" + college + "/COLLECTIONS.json", "w") as f1:
-            response = httpx.get(COLLECTIONS + key, timeout=500)
-            data = response.json()
-            collections = json.dumps(data)
-            f1.write(collections)
+        # get collections data in XML; write to file
+        with open("data/" + TODAY + "/" + college + "/COLLECTIONS.xml", "w") as f1:
+            response1 = httpx.get(COLLECTIONS_XML + key, timeout=500)
+            data_xml = response1.text
+            f1.write(data_xml)
 
-        bibs(data, key, college)
+        # get collections data in JSON; run collection-level analyis
+        response2 = httpx.get(COLLECTIONS_JSON + key, timeout=500)
+        data_json = response2.json()
+        bibs(data_json, key, college)
 
 
-main()
+if __name__ == "__main__":
+    main()
