@@ -2,7 +2,7 @@ import dotenv
 import httpx
 import json
 import os
-from datetime import date, datetime
+from datetime import date
 from pprint import pprint
 
 
@@ -62,7 +62,7 @@ def paginate(collection, counter, key):
 def main():
     """run the program"""
 
-    if datetime.today().day == 1:
+    if date.today().day == 1:
         # see if data for today already exists
         for college, key in config.items():
             print("working on " + college + " collections...")
