@@ -2,7 +2,7 @@ import dotenv
 import httpx
 import json
 import os
-from datetime import date
+from datetime import date, datetime
 from pprint import pprint
 
 
@@ -62,25 +62,28 @@ def paginate(collection, counter, key):
 def main():
     """run the program"""
 
-    # see if data for today already exists
-    for college, key in config.items():
-        print("working on " + college + " collections...")
-        try:
-            os.makedirs("data/" + TODAY + "/" + college, exist_ok=False)
-        except FileExistsError:
-            print("Data for today already exists")
-            return
+    if datetime.today().day == 1:
+        # see if data for today already exists
+        for college, key in config.items():
+            print("working on " + college + " collections...")
+            try:
+                os.makedirs("data/" + TODAY + "/" + college, exist_ok=False)
+            except FileExistsError:
+                print("Data for today already exists")
+                return
 
-        # get collections data in XML; write to file
-        with open("data/" + TODAY + "/" + college + "/COLLECTIONS.xml", "w") as f1:
-            response1 = httpx.get(COLLECTIONS_XML + key, timeout=500)
-            data_xml = response1.text
-            f1.write(data_xml)
+            # get collections data in XML; write to file
+            with open("data/" + TODAY + "/" + college + "/COLLECTIONS.xml", "w") as f1:
+                response1 = httpx.get(COLLECTIONS_XML + key, timeout=500)
+                data_xml = response1.text
+                f1.write(data_xml)
 
-        # get collections data in JSON; run collection-level analyis
-        response2 = httpx.get(COLLECTIONS_JSON + key, timeout=500)
-        data_json = response2.json()
-        bibs(data_json, key, college)
+            # get collections data in JSON; run collection-level analyis
+            response2 = httpx.get(COLLECTIONS_JSON + key, timeout=500)
+            data_json = response2.json()
+            bibs(data_json, key, college)
+    else:
+        print("Not the first of the month. No action taken.")
 
 
 if __name__ == "__main__":
