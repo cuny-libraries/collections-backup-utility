@@ -27,10 +27,11 @@ def bibs(collections, key, college):
 
             # remove "/"s from collection names so they don't break paths
             coll_name = collection["name"].replace("/", ".")
+            coll_id = collection["mms_id"]["value"]
             global mmsids
 
             with open(
-                "data/" + TODAY + "/" + college + "/" + coll_name + ".csv", "w"
+                "data/" + TODAY + "/" + college + "/" + coll_name + "-" + coll_id + ".csv", "w"
             ) as f2:
                 f2.write("MMS ID\n")
                 for mmsid in mmsids:
