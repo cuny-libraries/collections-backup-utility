@@ -218,3 +218,25 @@ def test_run_is_a_noop_when_month_already_complete(tmp_path):
     core.run(client, {"Hunter": "KEY"}, date(2026, 6, 13), tmp_path)
 
     assert client.requests == []  # zero network activity
+
+
+def test_run_reports_progress_via_log_callback(tmp_path):
+    client = _alma_client()
+    logs = []
+    core.run(client, {"Hunter": "KEY"}, date(2026, 6, 13), tmp_path, log=logs.append)
+
+    assert any("Hunter" in m for m in logs)  # the college is announced
+    assert any("Bio" in m for m in logs)  # a collection name appears
+    assert any("done" in m.lower() and "Hunter" in m for m in logs)  # completion
+
+
+def test_run_logs_skipped_collections_on_resume(tmp_path):
+    base = tmp_path / "2026-06" / "Hunter"
+    base.mkdir(parents=True)
+    (base / "Bio-B1.csv").write_text("PRE-EXISTING\n")  # Bio already done last run
+
+    client = _alma_client()
+    logs = []
+    core.run(client, {"Hunter": "KEY"}, date(2026, 6, 13), tmp_path, log=logs.append)
+
+    assert any("Bio" in m and "skip" in m.lower() for m in logs)

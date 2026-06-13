@@ -16,13 +16,18 @@ from collections_backup import core
 TIMEOUT = httpx.Timeout(500.0)
 
 
+def log(message: str) -> None:
+    """Print a progress line, flushing so it appears live under systemd/journald."""
+    print(message, flush=True)
+
+
 def main() -> None:
     config = dotenv.dotenv_values(".env")
     today = date.today()
-    print(f"Backing up collections for {core.month_key(today)}...")
+    log(f"Backing up collections for {core.month_key(today)}...")
     with httpx.Client(timeout=TIMEOUT) as client:
-        core.run(client, config, today, Path("data"))
-    print("Done.")
+        core.run(client, config, today, Path("data"), log=log)
+    log("Done.")
 
 
 if __name__ == "__main__":

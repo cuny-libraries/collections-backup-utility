@@ -22,6 +22,10 @@ BIBS_PARAMS = "/bibs?level=2&format=json&limit=100&apikey="
 PAGE_SIZE = 100
 
 
+def _noop(_message: str) -> None:
+    """Default ``log`` sink: discard progress messages (keeps the core silent)."""
+
+
 def month_key(today: date) -> str:
     """Return the stable, month-granular key for a run, e.g. ``"2026-06"``."""
     return today.strftime("%Y-%m")
@@ -135,32 +139,38 @@ def backup_college(
     key: str,
     *,
     get=get_with_retries,
+    log=_noop,
 ) -> None:
     """Back up one college, skipping work already on disk.
 
     Resume is driven entirely by file presence: a ``COMPLETE`` marker skips the
     whole college, and an existing per-collection CSV skips that collection.
+    Progress is reported through the ``log`` callback (a no-op by default).
     """
     college_dir = Path(month_base) / college
     complete = college_dir / "COMPLETE"
     if complete.exists():
+        log(f"{college}: already complete, skipping")
         return
 
     xml_path = college_dir / "COLLECTIONS.xml"
     if not xml_path.exists():
         _atomic_write_text(xml_path, get(client, COLLECTIONS_XML + key).text)
 
-    listing = get(client, COLLECTIONS_JSON + key).json()
-    for coll in flatten_collections(listing):
-        csv_path = collection_csv_path(
-            month_base, college, coll["name"], coll["mms_id"]
-        )
+    collections = flatten_collections(get(client, COLLECTIONS_JSON + key).json())
+    log(f"{college}: {len(collections)} collections")
+    for coll in collections:
+        name = coll["name"]
+        csv_path = collection_csv_path(month_base, college, name, coll["mms_id"])
         if csv_path.exists():
+            log(f"  {college}: {name} — already saved, skipping")
             continue
         mmsids = fetch_all_mmsids(client, coll["pid_link"], key, get=get)
         write_csv_atomic(csv_path, mmsids)
+        log(f"  {college}: {name} — {len(mmsids)} ids")
 
     complete.touch()
+    log(f"{college}: done")
 
 
 def run(
@@ -170,16 +180,21 @@ def run(
     base_dir: Path,
     *,
     get=get_with_retries,
+    log=_noop,
 ) -> None:
     """Back up every college for the current month, resuming if interrupted.
 
     No-op once the month's top-level ``COMPLETE`` marker exists, so a daily timer
-    can fire harmlessly after the month's backup is done.
+    can fire harmlessly after the month's backup is done. Progress is reported
+    through the ``log`` callback (a no-op by default).
     """
-    base = Path(base_dir) / month_key(today)
+    month = month_key(today)
+    base = Path(base_dir) / month
     if (base / "COMPLETE").exists():
+        log(f"{month}: already complete, nothing to do")
         return
     for college, key in config.items():
-        backup_college(client, base, college, key, get=get)
+        backup_college(client, base, college, key, get=get, log=log)
     base.mkdir(parents=True, exist_ok=True)
     (base / "COMPLETE").touch()
+    log(f"{month}: all colleges complete")
