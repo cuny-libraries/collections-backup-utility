@@ -1,0 +1,12 @@
+[Unit]
+Description=Backup Alma electronic collections (MMS IDs per collection)
+Documentation=https://github.com/cuny-libraries/collections-backup-utility
+# Only start once the network is up (best-effort for user services).
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/git/collections-backup-utility
+ExecStart=/snap/bin/uv run python -m collections_backup
+# The job is resumable: re-running picks up where an interrupted run left off,
+# so a non-zero exit (e.g. laptop slept mid-run) is simply retried by the timer.

@@ -1,0 +1,16 @@
+[Unit]
+Description=Daily trigger for the Alma collections backup
+Documentation=https://github.com/cuny-libraries/collections-backup-utility
+
+[Timer]
+# Fire once a day. The job targets the current month and is a no-op once that
+# month's backup is complete, so daily firing is cheap and self-resuming: a run
+# interrupted by sleep/shutdown is finished by the next day's trigger.
+OnCalendar=daily
+# Run as soon as possible after a missed trigger (laptop was off/asleep).
+Persistent=true
+# Spread the start a little so it doesn't race other wake-up jobs.
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target
