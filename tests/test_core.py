@@ -232,22 +232,36 @@ def test_run_backs_up_every_college_with_its_own_key(tmp_path):
     assert (month / "Brooklyn" / "COMPLETE").exists()
 
 
-def test_run_resumes_without_refetching_existing_collections(tmp_path):
+def test_run_resumes_without_refetching_saved_files(tmp_path):
     base = tmp_path / "2026-06" / "Hunter"
     base.mkdir(parents=True)
-    (base / "Bio-B1.csv").write_text("PRE-EXISTING\n")  # pretend Bio finished last run
+    # Pretend the last run saved the XML dump and finished Bio before stopping.
+    (base / "COLLECTIONS.xml").write_text("<saved/>")
+    (base / "Bio-B1.csv").write_text("PRE-EXISTING\n")
 
     client = _fake_alma(ALMA_RESPONSES)
     core.run(client, {"Hunter": "KEY"}, date(2026, 6, 13), tmp_path)
 
+    assert (base / "COLLECTIONS.xml").read_text() == "<saved/>"  # untouched
     assert (base / "Bio-B1.csv").read_text() == "PRE-EXISTING\n"  # untouched
     assert client.requested == [
-        f"{ALMA}?level=20&apikey=KEY",
         f"{ALMA}?level=20&format=json&apikey=KEY",
         f"http://alma/A1/{BIBS}&apikey=KEY&offset=0",
         f"http://alma/A1/{BIBS}&apikey=KEY&offset=100",
-    ]  # Bio was not downloaded again
+    ]  # neither the XML dump nor Bio was downloaded again
     assert (base / "Art-A1.csv").read_text() == "MMS ID\nA1-1\n"
+    assert (tmp_path / "2026-06" / "COMPLETE").exists()
+
+
+def test_run_skips_a_college_already_marked_complete(tmp_path):
+    hunter = tmp_path / "2026-06" / "Hunter"
+    hunter.mkdir(parents=True)
+    (hunter / "COMPLETE").touch()
+
+    client = _fake_alma({})
+    core.run(client, {"Hunter": "KEY"}, date(2026, 6, 13), tmp_path)
+
+    assert client.requested == []  # nothing fetched for Hunter
     assert (tmp_path / "2026-06" / "COMPLETE").exists()
 
 
