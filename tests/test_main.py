@@ -3,6 +3,7 @@
 from datetime import date
 
 import httpx
+import pytest
 
 from collections_backup import __main__ as cli
 
@@ -43,6 +44,17 @@ def test_main_backs_up_colleges_from_env_file_into_data_folder(
     assert (month / "Hunter" / "COMPLETE").exists()
     assert (month / "COMPLETE").exists()
     assert "Hunter: done" in capsys.readouterr().out  # progress reaches the journal
+
+
+def test_main_fails_loudly_without_marking_complete_when_env_file_is_missing(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)  # a folder with no .env in it
+
+    with pytest.raises(SystemExit, match="No colleges configured"):
+        cli.main()
+
+    assert not (tmp_path / "data").exists()  # no month marked COMPLETE
 
 
 def test_main_waits_up_to_500_seconds_for_slow_alma_responses(tmp_path, monkeypatch):
