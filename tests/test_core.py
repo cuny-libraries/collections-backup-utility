@@ -64,15 +64,15 @@ def test_mmsids_from_page_empty_when_no_bibs():
     assert core.mmsids_from_page({"total_record_count": 0}) == []
 
 
-def _flaky_client(fail_times):
-    """An httpx.Client whose transport raises ConnectError `fail_times` times,
+def _flaky_client(fail_times, error=httpx.ConnectError):
+    """An httpx.Client whose transport raises `error` `fail_times` times,
     then returns 200. Records how many times it was called via `.calls`."""
     state = {"calls": 0}
 
     def handler(request):
         state["calls"] += 1
         if state["calls"] <= fail_times:
-            raise httpx.ConnectError("boom", request=request)
+            raise error("boom", request=request)
         return httpx.Response(200, text="ok")
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
@@ -94,6 +94,19 @@ def test_get_with_retries_raises_after_exhausting_attempts():
     with pytest.raises(httpx.TransportError):
         core.get_with_retries(client, "http://alma/x", retries=3, sleep=lambda _s: None)
     assert client.calls["calls"] == 3  # gave up after `retries` attempts
+
+
+def test_get_with_retries_retries_timeouts():
+    client = _flaky_client(fail_times=1, error=httpx.ReadTimeout)
+    response = core.get_with_retries(client, "http://alma/x", sleep=lambda _s: None)
+    assert response.status_code == 200
+
+
+def test_get_with_retries_by_default_waits_1s_then_2s_between_attempts():
+    client = _flaky_client(fail_times=2)
+    waits = []
+    core.get_with_retries(client, "http://alma/x", sleep=waits.append)
+    assert waits == [1.0, 2.0]
 
 
 # The Alma collections endpoint, and the query every /bibs page request uses.
