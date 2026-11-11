@@ -198,6 +198,40 @@ def test_run_backs_up_all_collections_and_writes_markers(tmp_path):
     assert (tmp_path / "2026-06" / "COMPLETE").exists()
 
 
+def test_run_backs_up_every_college_with_its_own_key(tmp_path):
+    client = _fake_alma(
+        {
+            f"{ALMA}?level=20&apikey=HUNTER-KEY": "<hunter/>",
+            f"{ALMA}?level=20&format=json&apikey=HUNTER-KEY": {
+                "collection": [
+                    {
+                        "name": "Bio",
+                        "mms_id": {"value": "B1"},
+                        "pid": {"link": "http://alma/B1"},
+                    }
+                ]
+            },
+            f"http://alma/B1/{BIBS}&apikey=HUNTER-KEY&offset=0": {
+                "bib": [{"mms_id": "B1-1"}]
+            },
+            f"http://alma/B1/{BIBS}&apikey=HUNTER-KEY&offset=100": {},
+            f"{ALMA}?level=20&apikey=BROOKLYN-KEY": "<brooklyn/>",
+            f"{ALMA}?level=20&format=json&apikey=BROOKLYN-KEY": {
+                "total_record_count": 0
+            },
+        }
+    )
+    config = {"Hunter": "HUNTER-KEY", "Brooklyn": "BROOKLYN-KEY"}
+    core.run(client, config, date(2026, 6, 13), tmp_path)
+
+    month = tmp_path / "2026-06"
+    assert (month / "Hunter" / "COLLECTIONS.xml").read_text() == "<hunter/>"
+    assert (month / "Hunter" / "Bio-B1.csv").read_text() == "MMS ID\nB1-1\n"
+    assert (month / "Hunter" / "COMPLETE").exists()
+    assert (month / "Brooklyn" / "COLLECTIONS.xml").read_text() == "<brooklyn/>"
+    assert (month / "Brooklyn" / "COMPLETE").exists()
+
+
 def test_run_resumes_without_refetching_existing_collections(tmp_path):
     base = tmp_path / "2026-06" / "Hunter"
     base.mkdir(parents=True)
