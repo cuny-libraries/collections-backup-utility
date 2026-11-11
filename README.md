@@ -20,6 +20,8 @@ sleeps mid-run — without losing or duplicating data:
 - `COMPLETE` marker files record finished work: one per college, and one per month.
   Once the month's `COMPLETE` marker exists, the job is a fast **no-op**.
 - Transient network errors (timeouts, dropped connections) are retried with backoff.
+- An error response from Alma (e.g. a bad API key, or the daily API limit) stops the
+  run without marking anything complete, so the next run picks up where it left off.
 
 Because every run targets the current month and resumes from disk, a **daily** timer is
 all that's needed: the first run of the month does the work, an interrupted run is
