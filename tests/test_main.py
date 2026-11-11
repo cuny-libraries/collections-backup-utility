@@ -43,3 +43,20 @@ def test_main_backs_up_colleges_from_env_file_into_data_folder(
     assert (month / "Hunter" / "COMPLETE").exists()
     assert (month / "COMPLETE").exists()
     assert "Hunter: done" in capsys.readouterr().out  # progress reaches the journal
+
+
+def test_main_waits_up_to_500_seconds_for_slow_alma_responses(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text("Hunter=HUNTER-KEY\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "date", June13)
+    read_timeouts = []
+
+    def recording_network(transport, request):
+        read_timeouts.append(request.extensions["timeout"]["read"])
+        return fake_network(transport, request)
+
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", recording_network)
+
+    cli.main()
+
+    assert read_timeouts == [500.0, 500.0]  # one per request
