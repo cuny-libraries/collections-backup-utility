@@ -96,37 +96,63 @@ def test_get_with_retries_raises_after_exhausting_attempts():
     assert client.calls["calls"] == 3  # gave up after `retries` attempts
 
 
-def _paging_client(pages_by_offset):
-    """Client that serves a JSON page per requested `offset`, recording offsets."""
-    seen = []
+# The Alma collections endpoint, and the query every /bibs page request uses.
+ALMA = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/bibs/collections"
+BIBS = "bibs?level=2&format=json&limit=100"
+
+
+def _alma_handler(responses, requested):
+    """A fake Alma server that answers only the exact URLs in `responses`.
+
+    A value is sent as text if it's a str, or as JSON if it's a dict. Any other
+    URL fails the test, so a wrong query parameter or a missing API key can't
+    slip through. Each URL asked for is appended to `requested`.
+    """
 
     def handler(request):
-        offset = request.url.params.get("offset")
-        seen.append(offset)
-        return httpx.Response(200, json=pages_by_offset.get(offset, {}))
+        url = str(request.url)
+        requested.append(url)
+        assert url in responses, f"unexpected request: {url}"
+        body = responses[url]
+        if isinstance(body, str):
+            return httpx.Response(200, text=body)
+        return httpx.Response(200, json=body)
 
+    return handler
+
+
+def _fake_alma(responses):
+    """An httpx.Client wired to the fake Alma server (see `_alma_handler`).
+
+    Records every requested URL, in order, in `.requested`.
+    """
+    requested = []
+    handler = _alma_handler(responses, requested)
     client = httpx.Client(transport=httpx.MockTransport(handler))
-    client.seen_offsets = seen  # type: ignore[attr-defined]
+    client.requested = requested  # type: ignore[attr-defined]
     return client
 
 
 def test_fetch_all_mmsids_paginates_until_empty_page():
-    client = _paging_client(
+    client = _fake_alma(
         {
-            "0": {"bib": [{"mms_id": "1"}, {"mms_id": "2"}]},
-            "100": {"bib": [{"mms_id": "3"}]},
-            "200": {},
+            f"http://alma/coll/{BIBS}&apikey=KEY&offset=0": {
+                "bib": [{"mms_id": "1"}, {"mms_id": "2"}]
+            },
+            f"http://alma/coll/{BIBS}&apikey=KEY&offset=100": {
+                "bib": [{"mms_id": "3"}]
+            },
+            f"http://alma/coll/{BIBS}&apikey=KEY&offset=200": {},
         }
     )
     ids = core.fetch_all_mmsids(client, "http://alma/coll", "KEY")
     assert ids == ["1", "2", "3"]
-    assert client.seen_offsets == ["0", "100", "200"]
 
 
 def test_fetch_all_mmsids_returns_empty_without_pid_link():
-    client = _paging_client({})
+    client = _fake_alma({})
     assert core.fetch_all_mmsids(client, None, "KEY") == []
-    assert client.seen_offsets == []  # no network calls made
+    assert client.requested == []  # no network calls made
 
 
 def test_write_csv_atomic_writes_header_and_ids(tmp_path):
@@ -148,42 +174,20 @@ COLLECTIONS_PAYLOAD = {
         {"name": "Art", "mms_id": {"value": "A1"}, "pid": {"link": "http://alma/A1"}},
     ]
 }
-BIB_PAGES = {
-    "B1": {"0": {"bib": [{"mms_id": "B1-1"}, {"mms_id": "B1-2"}]}, "100": {}},
-    "A1": {"0": {"bib": [{"mms_id": "A1-1"}]}, "100": {}},
+ALMA_RESPONSES = {
+    f"{ALMA}?level=20&apikey=KEY": "<xml/>",
+    f"{ALMA}?level=20&format=json&apikey=KEY": COLLECTIONS_PAYLOAD,
+    f"http://alma/B1/{BIBS}&apikey=KEY&offset=0": {
+        "bib": [{"mms_id": "B1-1"}, {"mms_id": "B1-2"}]
+    },
+    f"http://alma/B1/{BIBS}&apikey=KEY&offset=100": {},
+    f"http://alma/A1/{BIBS}&apikey=KEY&offset=0": {"bib": [{"mms_id": "A1-1"}]},
+    f"http://alma/A1/{BIBS}&apikey=KEY&offset=100": {},
 }
 
 
-def _alma_client():
-    """A MockTransport client emulating the Alma collections + bibs endpoints.
-
-    Records every request path and the set of collection ids whose bibs were
-    actually fetched, so tests can assert what was (and wasn't) re-downloaded.
-    """
-    requests = []
-    fetched = set()
-
-    def handler(request):
-        requests.append(request.url.path)
-        url = request.url
-        if url.path.endswith("/collections"):
-            if url.params.get("format") == "json":
-                return httpx.Response(200, json=COLLECTIONS_PAYLOAD)
-            return httpx.Response(200, text="<xml/>")
-        coll_id = url.path.split("/")[1]  # "/B1/bibs" -> "B1"
-        fetched.add(coll_id)
-        return httpx.Response(
-            200, json=BIB_PAGES[coll_id].get(url.params.get("offset"), {})
-        )
-
-    client = httpx.Client(transport=httpx.MockTransport(handler))
-    client.requests = requests  # type: ignore[attr-defined]
-    client.fetched = fetched  # type: ignore[attr-defined]
-    return client
-
-
 def test_run_backs_up_all_collections_and_writes_markers(tmp_path):
-    client = _alma_client()
+    client = _fake_alma(ALMA_RESPONSES)
     core.run(client, {"Hunter": "KEY"}, date(2026, 6, 13), tmp_path)
 
     base = tmp_path / "2026-06" / "Hunter"
@@ -199,13 +203,17 @@ def test_run_resumes_without_refetching_existing_collections(tmp_path):
     base.mkdir(parents=True)
     (base / "Bio-B1.csv").write_text("PRE-EXISTING\n")  # pretend Bio finished last run
 
-    client = _alma_client()
+    client = _fake_alma(ALMA_RESPONSES)
     core.run(client, {"Hunter": "KEY"}, date(2026, 6, 13), tmp_path)
 
     assert (base / "Bio-B1.csv").read_text() == "PRE-EXISTING\n"  # untouched
-    assert "B1" not in client.fetched  # not re-downloaded
-    assert "A1" in client.fetched  # the missing one was fetched
-    assert (base / "Art-A1.csv").exists()
+    assert client.requested == [
+        f"{ALMA}?level=20&apikey=KEY",
+        f"{ALMA}?level=20&format=json&apikey=KEY",
+        f"http://alma/A1/{BIBS}&apikey=KEY&offset=0",
+        f"http://alma/A1/{BIBS}&apikey=KEY&offset=100",
+    ]  # Bio was not downloaded again
+    assert (base / "Art-A1.csv").read_text() == "MMS ID\nA1-1\n"
     assert (tmp_path / "2026-06" / "COMPLETE").exists()
 
 
@@ -214,14 +222,14 @@ def test_run_is_a_noop_when_month_already_complete(tmp_path):
     month.mkdir(parents=True)
     (month / "COMPLETE").touch()
 
-    client = _alma_client()
+    client = _fake_alma({})
     core.run(client, {"Hunter": "KEY"}, date(2026, 6, 13), tmp_path)
 
-    assert client.requests == []  # zero network activity
+    assert client.requested == []  # zero network activity
 
 
 def test_run_reports_progress_via_log_callback(tmp_path):
-    client = _alma_client()
+    client = _fake_alma(ALMA_RESPONSES)
     logs = []
     core.run(client, {"Hunter": "KEY"}, date(2026, 6, 13), tmp_path, log=logs.append)
 
@@ -235,7 +243,7 @@ def test_run_logs_skipped_collections_on_resume(tmp_path):
     base.mkdir(parents=True)
     (base / "Bio-B1.csv").write_text("PRE-EXISTING\n")  # Bio already done last run
 
-    client = _alma_client()
+    client = _fake_alma(ALMA_RESPONSES)
     logs = []
     core.run(client, {"Hunter": "KEY"}, date(2026, 6, 13), tmp_path, log=logs.append)
 
