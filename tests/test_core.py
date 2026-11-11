@@ -117,10 +117,11 @@ BIBS = "bibs?level=2&format=json&limit=100"
 def _alma_handler(responses, requested):
     """A fake Alma server that answers only the exact URLs in `responses`.
 
-    A value is sent as text if it's a str, or as JSON if it's a dict; if it's
-    an exception, it's raised instead (to simulate a crash). Any other URL
-    fails the test, so a wrong query parameter or a missing API key can't slip
-    through. Each URL asked for is appended to `requested`.
+    A value is sent as text if it's a str, or as JSON if it's a dict; an
+    httpx.Response is sent as-is (e.g. for an error status); an exception is
+    raised instead (to simulate a crash). Any other URL fails the test, so a
+    wrong query parameter or a missing API key can't slip through. Each URL
+    asked for is appended to `requested`.
     """
 
     def handler(request):
@@ -130,6 +131,8 @@ def _alma_handler(responses, requested):
         body = responses[url]
         if isinstance(body, Exception):
             raise body
+        if isinstance(body, httpx.Response):
+            return body
         if isinstance(body, str):
             return httpx.Response(200, text=body)
         return httpx.Response(200, json=body)
@@ -292,6 +295,27 @@ def test_interrupted_run_is_not_marked_complete(tmp_path):
 
     base = tmp_path / "2026-06" / "Hunter"
     assert (base / "Bio-B1.csv").read_text() == "MMS ID\nB1-1\nB1-2\n"  # kept
+    assert not (base / "Art-A1.csv").exists()
+    assert not (base / "COMPLETE").exists()
+    assert not (tmp_path / "2026-06" / "COMPLETE").exists()
+
+
+def test_alma_error_stops_the_run_without_saving_it_or_marking_complete(tmp_path):
+    hits_daily_api_limit = {
+        **ALMA_RESPONSES,
+        f"http://alma/A1/{BIBS}&apikey=KEY&offset=0": httpx.Response(
+            429, json={"errorsExist": True}
+        ),
+    }
+    with pytest.raises(httpx.HTTPStatusError, match="429"):
+        core.run(
+            _fake_alma(hits_daily_api_limit),
+            {"Hunter": "KEY"},
+            date(2026, 6, 13),
+            tmp_path,
+        )
+
+    base = tmp_path / "2026-06" / "Hunter"
     assert not (base / "Art-A1.csv").exists()
     assert not (base / "COMPLETE").exists()
     assert not (tmp_path / "2026-06" / "COMPLETE").exists()

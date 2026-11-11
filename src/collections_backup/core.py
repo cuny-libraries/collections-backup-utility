@@ -82,10 +82,12 @@ def get_with_retries(
     Retries only transient transport errors (timeouts, dropped connections) —
     safe because every request is an idempotent GET. Sleeps ``backoff * 2**n``
     between attempts and re-raises the last error once ``retries`` is exhausted.
+    An error status from Alma (e.g. a bad API key, or 429 once the daily API
+    limit is hit) raises ``httpx.HTTPStatusError`` so it is never saved as data.
     """
     for attempt in range(retries):
         try:
-            return client.get(url)
+            return client.get(url).raise_for_status()
         except httpx.TransportError:
             if attempt == retries - 1:
                 raise
