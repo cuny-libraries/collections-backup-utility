@@ -37,6 +37,9 @@ Hunter=YOUR_ALMA_API_KEY
 Brooklyn=YOUR_ALMA_API_KEY
 ```
 
+Because it's git-ignored, a fresh clone won't have it — copy it over separately. If
+`.env` is missing or empty, the run exits with an error instead of backing up nothing.
+
 ## Running manually
 
 ```bash
