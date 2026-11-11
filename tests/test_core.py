@@ -180,8 +180,15 @@ def test_write_csv_atomic_writes_header_and_ids(tmp_path):
 def test_write_csv_atomic_leaves_no_temp_file(tmp_path):
     path = tmp_path / "Hunter" / "Bio-991.csv"
     core.write_csv_atomic(path, ["991"])
-    leftovers = [p.name for p in path.parent.iterdir() if p.name != path.name]
-    assert leftovers == []
+    assert [p.name for p in path.parent.iterdir()] == ["Bio-991.csv"]
+
+
+def test_write_csv_atomic_leaves_no_partial_file_if_write_fails(tmp_path):
+    path = tmp_path / "Hunter" / "Bio-991.csv"
+    # "\ud800" can't be encoded, so the write fails after the file is opened.
+    with pytest.raises(UnicodeEncodeError):
+        core.write_csv_atomic(path, ["991", "\ud800"])
+    assert not path.exists()
 
 
 COLLECTIONS_PAYLOAD = {
