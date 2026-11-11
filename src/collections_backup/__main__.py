@@ -4,6 +4,7 @@ Run with ``python -m collections_backup`` (this is what the systemd unit calls).
 Reads ``.env`` (``college=apikey`` per line) from the current working directory.
 """
 
+import sys
 from datetime import date
 from pathlib import Path
 
@@ -23,6 +24,12 @@ def log(message: str) -> None:
 
 def main() -> None:
     config = dotenv.dotenv_values(".env")
+    if not config:
+        # dotenv returns {} for a missing file; without colleges the month would
+        # be marked COMPLETE with nothing backed up.
+        sys.exit(
+            f"No colleges configured: {Path('.env').resolve()} is missing or empty."
+        )
     today = date.today()
     log(f"Backing up collections for {core.month_key(today)}...")
     with httpx.Client(timeout=TIMEOUT) as client:
